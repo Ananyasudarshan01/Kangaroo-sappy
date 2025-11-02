@@ -13,7 +13,7 @@ import base64
 # ----------------------------
 # PAGE CONFIG
 # ----------------------------
-st.set_page_config(page_title="People Counter", layout="centered")
+st.set_page_config(page_title=" ", layout="centered")
 
 # ----------------------------
 # LOAD YOLO MODEL
@@ -140,7 +140,7 @@ class PersonDetector(VideoProcessorBase):
 # STREAMLIT UI
 # ----------------------------
 st.title("👥 People Counter")
-st.markdown("### Detects people and plays sound alerts instantly")
+st.markdown(" ")
 
 # Initialize session state
 if 'audio_enabled' not in st.session_state:
@@ -205,4 +205,4 @@ else:
     st.info("👆 Click **START** to activate camera and audio")
 
 st.markdown("---")
-st.caption("Built with YOLOv8 + Streamlit + WebRTC 💪")
+st.caption(" ")
