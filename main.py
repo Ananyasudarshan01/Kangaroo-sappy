@@ -33,16 +33,15 @@ AUDIO_FILES = {
 class PersonDetector(VideoProcessorBase):
     def __init__(self):
         self.person_count = 0
-        self.last_audio_count = 0
         self.frame_count = 0
-        self.detection_history = deque(maxlen=5)
+        self.detection_history = deque(maxlen=3)  # Shorter history for faster response
         
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
         self.frame_count += 1
         
-        # Process every 3rd frame for performance
-        if self.frame_count % 3 == 0:
+        # Process every 2nd frame for faster detection
+        if self.frame_count % 2 == 0:
             # Run YOLO detection
             results = model(img, 
                           verbose=False, 
@@ -94,6 +93,8 @@ if ctx.video_processor:
     audio_placeholder = st.empty()
     status_placeholder = st.empty()
     
+    last_played_count = 0
+    
     # Update display
     while ctx.state.playing:
         if hasattr(ctx.video_processor, 'person_count'):
@@ -106,22 +107,25 @@ if ctx.video_processor:
                 delta=None
             )
             
-            # Play audio when count changes
-            if current_count != ctx.video_processor.last_audio_count and current_count > 0:
+            # Play audio when count changes (non-blocking)
+            if current_count != last_played_count and current_count > 0:
                 if current_count in AUDIO_FILES:
                     audio_file = AUDIO_FILES[current_count]
                     try:
+                        # Clear previous audio first
+                        audio_placeholder.empty()
+                        # Play new audio
                         audio_placeholder.audio(audio_file, autoplay=True)
-                        ctx.video_processor.last_audio_count = current_count
+                        last_played_count = current_count
                         status_placeholder.success(f"🔊 Playing audio for {current_count} {'person' if current_count == 1 else 'people'}")
-                    except:
-                        status_placeholder.error(f"❌ Audio file {audio_file} not found")
-            elif current_count == 0:
-                ctx.video_processor.last_audio_count = 0
+                    except Exception as e:
+                        status_placeholder.error(f"❌ Audio file {audio_file} not found: {e}")
+            elif current_count == 0 and last_played_count != 0:
+                last_played_count = 0
                 audio_placeholder.empty()
                 status_placeholder.info("👀 Waiting for people...")
         
-        time.sleep(0.5)
+        time.sleep(0.3)  # Faster polling
 else:
     st.info("👆 Click **START** to begin detection")
     st.markdown("""
