@@ -114,8 +114,10 @@ if ctx.video_processor:
                     try:
                         # Clear previous audio first
                         audio_placeholder.empty()
-                        # Play new audio
-                        audio_placeholder.audio(audio_file, autoplay=True)
+                        # Play new audio with unique key
+                        with open(audio_file, 'rb') as f:
+                            audio_bytes = f.read()
+                        audio_placeholder.audio(audio_bytes, format='audio/mp3', autoplay=True)
                         last_played_count = current_count
                         status_placeholder.success(f"🔊 Playing audio for {current_count} {'person' if current_count == 1 else 'people'}")
                     except Exception as e:
