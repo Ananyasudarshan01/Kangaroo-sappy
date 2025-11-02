@@ -38,39 +38,46 @@ AUDIO_FILES = {
 }
 
 # ----------------------------
-# JS AUTOPLAY INJECTOR
+# JS AUTOPLAY & STOP LOGIC
 # ----------------------------
-def js_play_audio(file_path):
-    """Injects JS to force-play an audio clip (bypasses browser autoplay blocking)."""
-    try:
-        with open(file_path, "rb") as f:
-            audio_bytes = f.read()
-        b64 = base64.b64encode(audio_bytes).decode()
-        unique = str(time.time()).replace(".", "")
-        js_code = f"""
-        <script>
-        (async () => {{
-            const existing = document.getElementById("audio_{unique}");
-            if (existing) existing.remove();
+def js_control_audio(file_path=None, stop=False):
+    """Play or stop audio using persistent JS element."""
+    js_code = "<script>"
 
-            const audio = document.createElement('audio');
-            audio.id = "audio_{unique}";
-            audio.src = "data:audio/mp3;base64,{b64}";
-            audio.autoplay = true;
-            audio.volume = 1.0;
-            document.body.appendChild(audio);
-            try {{
-                await audio.play();
-                console.log("Audio played ✅");
-            }} catch (e) {{
-                console.warn("Autoplay blocked ❌", e);
-            }}
-        }})();
-        </script>
+    # Ensure only one global audio element exists
+    js_code += """
+    if (!window.peopleAudio) {
+        window.peopleAudio = document.createElement('audio');
+        window.peopleAudio.id = 'people_audio';
+        window.peopleAudio.autoplay = true;
+        window.peopleAudio.volume = 1.0;
+        document.body.appendChild(window.peopleAudio);
+    }
+    """
+
+    if stop:
+        js_code += """
+        if (window.peopleAudio) {
+            window.peopleAudio.pause();
+            window.peopleAudio.currentTime = 0;
+        }
         """
-        st.components.v1.html(js_code, height=0)
-    except Exception as e:
-        st.error(f"❌ Error playing {file_path}: {e}")
+    elif file_path:
+        try:
+            with open(file_path, "rb") as f:
+                audio_bytes = f.read()
+            b64 = base64.b64encode(audio_bytes).decode()
+            js_code += f"""
+            window.peopleAudio.pause();
+            window.peopleAudio.src = "data:audio/mp3;base64,{b64}";
+            window.peopleAudio.currentTime = 0;
+            window.peopleAudio.play().catch(e => console.warn("Autoplay blocked:", e));
+            """
+        except Exception as e:
+            st.error(f"❌ Audio load error: {e}")
+
+    js_code += "</script>"
+    st.components.v1.html(js_code, height=0)
 
 # ----------------------------
 # YOLO PERSON DETECTOR
@@ -107,7 +114,7 @@ class PersonDetector(VideoProcessorBase):
 # STREAMLIT UI
 # ----------------------------
 st.title("👥 People Counter")
-st.markdown("### Detects people and plays sound alerts intelligently")
+st.markdown("### Detects people and plays/stops sound alerts intelligently")
 
 # --- Config Controls ---
 st.sidebar.header("⚙️ Detection Settings")
@@ -138,11 +145,9 @@ if ctx.video_processor:
     stability_placeholder = st.empty()
     status_placeholder = st.empty()
 
-    # --- Stability variables ---
     stable_count = None
     candidate_count = None
     stability_counter = 0
-
     last_audio_time = 0
 
     while ctx.state.playing:
@@ -161,7 +166,7 @@ if ctx.video_processor:
                 f"Stability: {stability_counter}/{stability_threshold} (Target: {candidate_count})"
             )
 
-            # --- Only trigger if stable ---
+            # --- Trigger after stable period ---
             if stability_counter >= stability_threshold and stable_count != candidate_count:
                 stable_count = candidate_count
                 stability_counter = 0
@@ -171,12 +176,13 @@ if ctx.video_processor:
                     last_audio_time = now
 
                     if stable_count > 0 and stable_count in AUDIO_FILES:
-                        js_play_audio(AUDIO_FILES[stable_count])
+                        js_control_audio(AUDIO_FILES[stable_count])
                         status_placeholder.success(
                             f"🔊 Stable count: {stable_count} "
                             f"{'person' if stable_count == 1 else 'people'}"
                         )
                     else:
+                        js_control_audio(stop=True)
                         status_placeholder.info("👀 Waiting for people...")
 
         time.sleep(0.3)
@@ -185,4 +191,4 @@ else:
     st.info("👆 Click **START** to activate camera and audio")
 
 st.markdown("---")
-st.caption("Built with YOLOv8 + Streamlit + Stable Audio Logic 🎧")
+st.caption("Built with YOLOv8 + Streamlit + Smart Audio Control 🔉")
