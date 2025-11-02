@@ -31,15 +31,24 @@ AUDIO_FILES = {
 }
 
 # Helper: play audio safely (no duplicate element IDs)
+import base64
+
 def play_audio(file_path):
-    """Play an audio file by spawning a fresh placeholder each time."""
+    """Play audio using HTML embedding to avoid Streamlit widget caching."""
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             audio_bytes = f.read()
-        # Create a new placeholder dynamically for each playback
-        st.empty().audio(audio_bytes, format='audio/mp3', autoplay=True)
+        b64 = base64.b64encode(audio_bytes).decode()
+        unique_id = str(time.time())  # forces a new HTML element each time
+        audio_html = f"""
+        <audio autoplay>
+            <source src="data:audio/mp3;base64,{b64}?v={unique_id}" type="audio/mp3">
+        </audio>
+        """
+        st.markdown(audio_html, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"❌ Error playing {file_path}: {e}")
+
 
 # Video processor class
 class PersonDetector(VideoProcessorBase):
