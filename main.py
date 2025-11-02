@@ -1,141 +1,31 @@
-import os
-os.environ['OPENCV_VIDEOIO_PRIORITY_MSMF'] = '0'
-
-import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
-import av
-from ultralytics import YOLO
-import numpy as np
-from collections import deque
-import time
-
-# Page config
-st.set_page_config(page_title="People Counter", layout="centered")
-
-# Load YOLO model once
-@st.cache_resource
-def load_model():
-    model = YOLO("yolov8n.pt")
-    model.fuse()
-    return model
-
-model = load_model()
-
-# Audio file mapping (ensure these files exist in the same folder)
-AUDIO_FILES = {
-    1: "1_person.mp3",
-    2: "2_people.mp3",
-    3: "3_people.mp3",
-    4: "4_people.mp3",
-    5: "5_people.mp3"
-}
-
-# Helper: play audio safely (no duplicate element IDs)
 import base64
+import streamlit.components.v1 as components
 
 def play_audio(file_path):
-    """Play audio using HTML embedding to avoid Streamlit widget caching."""
+    """Embed base64 MP3 audio that auto-plays reliably across re-renders."""
     try:
         with open(file_path, "rb") as f:
             audio_bytes = f.read()
         b64 = base64.b64encode(audio_bytes).decode()
-        unique_id = str(time.time())  # forces a new HTML element each time
-        audio_html = f"""
-        <audio autoplay>
-            <source src="data:audio/mp3;base64,{b64}?v={unique_id}" type="audio/mp3">
-        </audio>
+        unique_id = str(time.time()).replace('.', '')
+        
+        # HTML + JS for guaranteed playback
+        html_code = f"""
+        <script>
+        var oldAudio = document.getElementById("audio_{unique_id}");
+        if (oldAudio) {{
+            oldAudio.pause();
+            oldAudio.remove();
+        }}
+        var audio = document.createElement("audio");
+        audio.id = "audio_{unique_id}";
+        audio.src = "data:audio/mp3;base64,{b64}";
+        audio.autoplay = true;
+        audio.volume = 1.0;
+        document.body.appendChild(audio);
+        audio.play().catch(e => console.log("Autoplay blocked:", e));
+        </script>
         """
-        st.markdown(audio_html, unsafe_allow_html=True)
+        components.html(html_code, height=0, width=0)
     except Exception as e:
         st.error(f"❌ Error playing {file_path}: {e}")
-
-
-# Video processor class
-class PersonDetector(VideoProcessorBase):
-    def __init__(self):
-        self.person_count = 0
-        self.frame_count = 0
-        self.detection_history = deque(maxlen=3)
-        
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        self.frame_count += 1
-        
-        # Run detection every 2nd frame for efficiency
-        if self.frame_count % 2 == 0:
-            results = model(
-                img,
-                verbose=False,
-                imgsz=640,
-                conf=0.4,
-                device='cpu'
-            )
-            
-            # Count 'person' class
-            count = sum(int(box.cls[0]) == 0 for box in results[0].boxes)
-            count = min(count, 5)
-            
-            self.detection_history.append(count)
-            if self.detection_history:
-                self.person_count = int(np.median(self.detection_history))
-        
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
-
-# UI setup
-st.title("👥 People Counter")
-st.markdown("### Detects number of people and plays an audio alert")
-
-# WebRTC streamer (uses webcam, no visible feed)
-ctx = webrtc_streamer(
-    key="people-detection",
-    mode=WebRtcMode.SENDRECV,
-    video_processor_factory=PersonDetector,
-    media_stream_constraints={
-        "video": {
-            "width": {"ideal": 640},
-            "height": {"ideal": 480}
-        },
-        "audio": False
-    },
-    async_processing=True,
-)
-
-st.markdown("---")
-
-if ctx.video_processor:
-    count_placeholder = st.empty()
-    status_placeholder = st.empty()
-    last_played_count = 0
-    
-    while ctx.state.playing:
-        if hasattr(ctx.video_processor, 'person_count'):
-            current_count = ctx.video_processor.person_count
-            
-            # Display count
-            count_placeholder.metric("People Detected", current_count)
-            
-            # Play sound when count changes
-            if current_count != last_played_count and current_count > 0:
-                if current_count in AUDIO_FILES:
-                    play_audio(AUDIO_FILES[current_count])
-                    status_placeholder.success(
-                        f"🔊 Playing audio for {current_count} "
-                        f"{'person' if current_count == 1 else 'people'}"
-                    )
-                last_played_count = current_count
-            elif current_count == 0 and last_played_count != 0:
-                last_played_count = 0
-                status_placeholder.info("👀 Waiting for people...")
-        
-        time.sleep(0.3)
-else:
-    st.info("👆 Click **START** to begin detection")
-    st.markdown("""
-    **How it works:**
-    - Uses your webcam in background (no video shown)
-    - Detects how many people are visible
-    - Plays a sound when the count changes
-    """)
-
-st.markdown("---")
-st.caption("*Powered by YOLOv8 + Streamlit WebRTC*")
