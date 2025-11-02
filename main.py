@@ -6,9 +6,6 @@ import cv2
 import numpy as np
 from collections import deque
 import time
-import os
-from gtts import gTTS
-import base64
 
 # Page config
 st.set_page_config(page_title="People Counter", layout="wide")
@@ -21,35 +18,6 @@ def load_model():
     return model
 
 model = load_model()
-
-# Audio mode selection
-AUDIO_MODE = st.sidebar.selectbox(
-    "Audio Mode",
-    ["MP3 Files", "Text-to-Speech"],
-    help="Choose between uploaded MP3 files or auto-generated speech"
-)
-
-# Generate TTS audio
-@st.cache_data
-def generate_tts_audio(count):
-    """Generate text-to-speech audio for person count"""
-    if count == 1:
-        text = "One person detected"
-    else:
-        text = f"{count} people detected"
-    
-    tts = gTTS(text=text, lang='en', slow=False)
-    audio_file = f"temp_{count}_people.mp3"
-    tts.save(audio_file)
-    
-    with open(audio_file, "rb") as f:
-        audio_bytes = f.read()
-    
-    # Clean up temp file
-    if os.path.exists(audio_file):
-        os.remove(audio_file)
-    
-    return audio_bytes
 
 # Audio file mapping
 AUDIO_FILES = {
@@ -189,14 +157,14 @@ with st.expander("ℹ️ Instructions"):
     1. Click **START** to activate your camera
     2. Allow camera permissions in your browser
     3. The app will detect people and play corresponding audio
-    4. Audio files needed: `1_person.mp3` through `5_people.mp3`
+    4. Make sure your MP3 files are in the repo root
     
-    **Requirements:**
-    - `streamlit`
-    - `streamlit-webrtc`
-    - `ultralytics`
-    - `opencv-python`
-    - `av`
+    **Required Files:**
+    - `1_person.mp3`
+    - `2_people.mp3`
+    - `3_people.mp3`
+    - `4_people.mp3`
+    - `5_people.mp3`
     """)
 
 # Footer
