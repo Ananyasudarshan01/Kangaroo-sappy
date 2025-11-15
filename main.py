@@ -139,8 +139,8 @@ class PersonDetector(VideoProcessorBase):
 # ----------------------------
 # STREAMLIT UI
 # ----------------------------
-st.title(" ")
-st.markdown(" ")
+
+
 
 # Initialize session state
 if 'audio_enabled' not in st.session_state:
@@ -200,5 +200,5 @@ if ctx.video_processor:
 
     
 
-st.markdown("---")
-st.caption(" ")
+
+
