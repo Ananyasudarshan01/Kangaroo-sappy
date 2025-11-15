@@ -162,7 +162,7 @@ ctx = webrtc_streamer(
     async_processing=True,
 )
 
-st.markdown("---")
+
 
 # Main processing loop
 if ctx.video_processor:
