@@ -149,11 +149,7 @@ if 'last_ui_count' not in st.session_state:
     st.session_state.last_ui_count = 0
 
 # Audio toggle
-st.session_state.audio_enabled = st.checkbox(
-    "Enable Audio Alerts", 
-    value=st.session_state.audio_enabled,
-    help="Play sound when people count changes"
-)
+
 
 ctx = webrtc_streamer(
     key="people-detection",
